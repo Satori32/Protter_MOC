@@ -31,7 +31,10 @@ public:
 	std::size_t Height() const {
 		return H;
 	}
-
+	bool Clear() {
+		D.clear();
+		return true;
+	}
 	bool Resize(const std::size_t Width, std::size_t Height) {
 		D.clear();
 		D.resize(Width * Height);
@@ -41,6 +44,10 @@ public:
 	}
 
 	bool SetPixel(const std::size_t& X,const std::size_t& Y,const RGB& C) {
+
+		if (X >= Width()) { return false; }
+		if (Y >= Height()) { return false; }
+
 		Index(X, Y) = C;
 
 		return true;
@@ -88,7 +95,7 @@ std::size_t culcBitmapFileHeader() {
 	return sizeof(BFH.Type) + sizeof(BFH.Size) + sizeof(BFH.Resurved1) + sizeof(BFH.Resurved2) + sizeof(BFH.OffBits);
 }
 std::ofstream& WriteSurface24(std::ofstream& ofs,const Surface24& S) {
-	for (std::size_t Y = 0; Y < S.Height(); Y++) {
+	for (std::intmax_t Y = S.Height()-1; Y >= 0; Y--) {
 		for (std::size_t X = 0; X < S.Width(); X++) {
 			ofs.write((char*)(&S.Index(X, Y)), 3);
 		}
@@ -157,22 +164,127 @@ int main() {
 //y = lambda;
 
 template<class F>
-double Prot(F& P,double XF,double Delta){
+Surface24 Prot(double XF, double Delta, F P) {
 	Surface24 S;
 	S.Resize(256, 256);
-	double M =1 / Delta;
-	for (int X = 0; X * M < 1; X++) {
-
-		double Y = P(XF);
-		S.SetPixel(P(XF), Y, { 0,0,100 });
+	double M = 1 / Delta;
+	double X = XF;
+	for (std::intmax_t i = 0; M * i <= 1; i++) {
+		double Y = P(X+i);
+		S.SetPixel(X+i, Y, { 0xff,0xff,0xff });
 	}
 
-}
+	return S;
 
+}
+/** /
 int main() {
 
 	//auto F = [](auto X) {return X + 1; };
-	Prot([](auto X) {return X + 1; }, 1, 100);
+	auto S = Prot(0, 100,[](auto X) {return X*X; });
+	std::string Name = "Test.bmp";
+
+
+	BitMapFileHeader BHF = MakeBitmapFileHeader(S);
+	BitMapHeader BH = MakeBitmapHeader(S);
+	{
+		std::ofstream ofs(Name, std::ios::binary);
+
+		WriteBitmapFileHeader(ofs, BHF);
+		WriteBitmapHeader(ofs, BH);
+		WriteSurface24(ofs, S);
+	}
+
 
 	return 0;
+}/**/
+class Plotter {
+public:
+	struct Point2D
+	{
+		std::intmax_t X=0;
+		std::intmax_t Y=0;
+	};
+
+	bool SetOrigin(const Point2D& In) {//Absolute position.
+		Origin = In;
+		return true;
+	}
+	bool SetOrignRelative(const Point2D& In) {
+		Origin.X = +In.X;
+		Origin.Y = +In.Y;
+		return true;
+	}
+	bool SetOriginCaptured(const Point2D& In) {
+		Origin.X += XPlusToUp ? In.X : -In.X;
+		Origin.Y += YPlusToUP ? In.Y : -In.Y;
+		return true;
+	}
+
+	bool SetYPlusIsUp(bool B) {
+		YPlusToUP = B;
+		return true;
+	}
+	bool SetXPlusToUp(bool B) {
+		XPlusToUp = B;
+		return true;
+	}
+
+	bool SetPixel(const Point2D& In, Surface24::RGB C) {
+
+		Point2D P = Origin;
+		P.X += XPlusToUp ? In.X : -In.X;
+		P.Y += YPlusToUP ? In.Y : -In.Y;
+
+		S.SetPixel(P.X, P.Y,C);
+
+		return true;
+	}
+
+	const Surface24& GetSurface() {
+		return S;
+	}
+	bool ResizeSurface(std::size_t W, std::size_t H) {
+		S.Resize(W, H);
+		return true;
+	}
+
+protected:
+	Surface24 S;
+	Point2D Origin;
+	bool YPlusToUP = false;
+	bool XPlusToUp = true;
+};
+
+int main() {
+	Plotter P;
+	P.SetOrigin({ 128, 128 });
+	P.SetYPlusIsUp(true);
+	P.SetXPlusToUp(false);
+
+
+	P.ResizeSurface(256, 256);
+
+	auto F = [](auto X) {return X; };//Y=Lambda.
+
+	for (std::size_t i = 0; i < 100; i++) {
+		std::intmax_t Y = F(i);
+		P.SetPixel({ (std::intmax_t)i,Y }, {0,0,0xff});
+	}
+	{
+		std::string Name = "Test.bmp";
+		auto& S = P.GetSurface();
+
+		BitMapFileHeader BHF = MakeBitmapFileHeader(S);
+		BitMapHeader BH = MakeBitmapHeader(S);
+
+		{
+			std::ofstream ofs(Name, std::ios::binary);
+
+			WriteBitmapFileHeader(ofs, BHF);
+			WriteBitmapHeader(ofs, BH);
+			WriteSurface24(ofs, S);
+		}
+
+	}
 }

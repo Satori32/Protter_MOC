@@ -23,5 +23,8 @@
     <Image Include="Hoge.bmp">
       <Filter>リソース ファイル</Filter>
     </Image>
+    <Image Include="Test.bmp">
+      <Filter>リソース ファイル</Filter>
+    </Image>
   </ItemGroup>
 </Project>
